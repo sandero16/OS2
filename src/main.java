@@ -28,9 +28,15 @@ class Process {
 		pid = p;
 		pageTable = new ArrayList<TablePageEntry>();
 		TablePageEntry t;
-		for (int a = 0; a < 15; a++) {
+		for (int a = 0; a < 16; a++) {
 			pageTable.add(new TablePageEntry());
-
+		}
+	}
+	public void printTable(){
+		System.out.println("size"+pageTable.size());
+		for(TablePageEntry tpe : pageTable){
+			tpe.printEntry();
+			System.out.println();
 		}
 	}
 	public List<Integer> verwijderFrames(int aantal) {
@@ -60,21 +66,25 @@ class Process {
 			}
 		}
 		aantalOver = aantal - verwijderd;
+		List<Integer> teVerwijderenFrames=new ArrayList<Integer>();
 		for (Integer i : framenummers) {
 			if (aantalOver > 0) {
 				vrijgekomenPlaatsen.add(i);
-				framenummers.remove(i);
+				teVerwijderenFrames.add(i);
 				aantalOver--;
 			} else {
 				break;
 			}
 		}
+		for(Integer i: teVerwijderenFrames){
+			framenummers.remove(i);
+		}
 		return vrijgekomenPlaatsen;
 
 	}
 	public boolean checkAanwezigFrame(int frame){
-		if(framenummers.contains(frame)){
-			return true;
+		for(TablePageEntry tpe: pageTable){
+			if(tpe.getFrameNummer()==frame&&tpe.getPresentBit()==1)return true;
 		}
 		return false;
 	}
@@ -108,51 +118,34 @@ class Process {
 			pageTable.get(index).setModifyBit(0);
 			framenummers.remove(frame);
 			useFrame(frame,clock,write);
-			/*int p;
-			boolean exists=false;
-			for(TablePageEntry t: pageTable){
-				if(t.getFrameNummer()==frame){
-					exists=true;
-					 p=pageTable.indexOf(t);
-				}
-			}
-			if(exists){
-				pageTable.get(p).setLastAccesTime(clock);
-				pageTable.get(p).setPresentBit(1);
-				if(write)pageTable.get(p).setModifyBit(1);
-			}
-			else{
-				if(write){
-					pageTable.add(new TablePageEntry(1,1,clock,frame));
-				}
-				else{
-					pageTable.add(new TablePageEntry(1,0,clock,frame));
-				}
-			}*/
+
 			framenummers.add(frame);
 
 		}
 		else{
 			//we gebruiken één van de gealloceerde plaatsen
-			boolean exists=false;
+			boolean exist=false;
+			int index=0;
 			for(int j=0;j<pageTable.size();j++){
 				if(pageTable.get(j).getFrameNummer()==frame){
-					exists=true;
-					pageTable.get(j).setPresentBit(1);
-					pageTable.get(j).setLastAccesTime(clock);
-					if(write)pageTable.get(j).setModifyBit(1);
-					else pageTable.get(j).setModifyBit(0);
+					exist=true;
+					index=j;
 				}
 
 			}
-			//indien de framenr nog niet in de page table staat
-			if(!exists){
-				if(write){
-					pageTable.add(new TablePageEntry(1,1,clock,frame));
+			if(exist)pageTable.get(index).setTableEntry(clock,write,frame);
+
+			if(!exist){
+				boolean found=false;
+				int index2=0;
+				for(int j=0;j<pageTable.size()&&!found;j++){
+					if(pageTable.get(j).getFrameNummer()==-1){
+						found=true;
+						index2=j;
+					}
+
 				}
-				else{
-					pageTable.add(new TablePageEntry(1,0,clock,frame));
-				}
+				pageTable.get(index2).setTableEntry(clock,write,frame);
 			}
 			framenummers.add(frame);
 
@@ -214,14 +207,6 @@ class Process {
 			pageTable.get(p).setPresentBit(1);
 			if(write)pageTable.get(p).setModifyBit(1);
 		}
-		else{
-			if(write){
-				pageTable.add(new TablePageEntry(1,1,clock,frame));
-			}
-			else{
-				pageTable.add(new TablePageEntry(1,0,clock,frame));
-			}
-		}
 
 	}
 	public void addFrame(Integer integer) {
@@ -257,7 +242,16 @@ class TablePageEntry {
 		lastAccesTime = l;
 		frameNummer = f;
 	}
-
+	public void setTableEntry(int clock, boolean write, int frame){
+		presentBit=1;
+		lastAccesTime=clock;
+		frameNummer=frame;
+		if(write)modifyBit=1;
+		else modifyBit=0;
+	}
+	public void printEntry(){
+		System.out.print("presentbit: "+presentBit+" modifybit: "+modifyBit+" framenummer:"+frameNummer+" la: "+lastAccesTime);
+	}
 	public int getPresentBit() {
 		return presentBit;
 	}
@@ -322,6 +316,12 @@ class Ram{
 		processen = new int[12];
 		aantalProc=0;
 	}
+	public void printRam(){
+		for(int i=0;i<12;i++){
+			System.out.print(processen[i]+" ");
+		}
+		System.out.println();
+	}
 	public void nieuwProcess(int id, List<Process> processenlijst) {
 		if (aantalProc == 4) {
 			int laagsteClock = 100000000;
@@ -348,19 +348,26 @@ class Ram{
 			for (int a = 0; a < 12; a++) {
 				processen[a] = id;
 			}
+			processenIds.add(id);
 			aantalProc++;
 		} else {
 			List<Integer> vrijgekomenFrames = new ArrayList<Integer>();
 			int teVerwijderenPerProcess = (12 / aantalProc - 12 / (aantalProc + 1));
+			System.out.println("size"+processenIds.size());
 			for (Integer i : processenIds) {
 				vrijgekomenFrames.addAll(processenlijst.get(i).verwijderFrames(teVerwijderenPerProcess));
-
+				for(Integer ids: vrijgekomenFrames){
+					System.out.println("vrij: "+ids);
+				}
+				System.out.println();
 			}
 			for (Integer i : vrijgekomenFrames) {
+
 				processen[i] = id;
 			}
 
 			processenlijst.get(id).getInRam(vrijgekomenFrames);
+			processenIds.add(id);
 			aantalProc++;
 		}
 	}
@@ -457,6 +464,10 @@ public class main {
 					p = new Instructie(pid, at, st);
 					instructielijst.add(p);
 					functies.get(at).run();
+					RAM.printRam();
+					for(int k=0;k<processenlijst.size();k++){
+						processenlijst.get(k).printTable();
+					}
 					clock++;
 
 				}
@@ -472,7 +483,10 @@ public class main {
 	}
 
 	public static void doeStart() {
+
 		System.out.println("Ik doe start");
+		Process p = new Process(pid);
+		processenlijst.add(pid, p);
 		LRUStart(-1,false);
 
 	}
@@ -498,9 +512,11 @@ public class main {
 		int frame=getFrame(st);
 		if(!processenlijst.get(pid).checkAanwezigFrame(frame)){
 			if(processenlijst.get(pid).framenummers.size()==0){
+				System.out.println("hier");
 				LRUStart(frame,true);
 			}
 			else{
+				System.out.println("rw");
 				LRUReadWrite(frame,true);
 			}
 		}
@@ -527,6 +543,15 @@ public class main {
 		 * 4 processen in ram -> 1 proces verwijderen => met laagste totale acces Time
 		 * 0-3 processen => per proces de 2^(3-n) met laagste acces Time
 		 */
+
+	}
+	public static void LRUNew(int frame,boolean write) {
+
+		System.out.println("LRU");
+
+		RAM.nieuwProcess(pid, processenlijst);
+		processenlijst.get(pid).useFrame(frame,clock,write);
+
 
 	}
 	
