@@ -47,48 +47,57 @@ class Process {
 	}
 
 	public List<Integer> verwijderFrames(int aantal) {
-		List<Integer> vrijgekomenPlaatsen = new ArrayList<Integer>();
-		Comparator<TablePageEntry> ATcomp = new AccesTimeComparator();
 
-		// Alle pageEntries die in het RAM zitten in de priorityqueue steken.
-		// Vervolgens de eerste 'aantal' pages van deze queue eruit halen
-		// Stel lijst te klein, kiezen voor random idle frames weg te geven.
-		PriorityQueue<TablePageEntry> ATqueue = new PriorityQueue<TablePageEntry>(16, ATcomp);
 
-		for (TablePageEntry tpe : pageTable) {
-			if (tpe.getPresentBit() == 1) {
-				ATqueue.add(tpe);
-			}
-		}
-		int verwijderd = 0;
-		int aantalOver = 0;
-		for (int a = 0; a < aantal; a++) {
-			if (!ATqueue.isEmpty()) {
-				ATqueue.peek().setPresentBit(0);
-				ATqueue.peek().setModifyBit(0);
-				framenummers.remove(ATqueue.peek().getFrameNummer());
-				vrijgekomenPlaatsen.add(ATqueue.peek().getFrameNummer());
-				ATqueue.remove();
-				verwijderd++;
-			}
-		}
-		aantalOver = aantal - verwijderd;
-		List<Integer> teVerwijderenFrames=new ArrayList<Integer>();
-		for (Integer i : framenummers) {
-			if (aantalOver > 0) {
-				vrijgekomenPlaatsen.add(i);
-				teVerwijderenFrames.add(i);
-				aantalOver--;
-			} else {
-				break;
-			}
-		}
-		for(Integer i: teVerwijderenFrames){
-			framenummers.remove(i);
-		}
-		return vrijgekomenPlaatsen;
+			List<Integer> vrijgekomenPlaatsen = new ArrayList<Integer>();
+			Comparator<TablePageEntry> ATcomp = new AccesTimeComparator();
+			List<Integer> vrijeFrames = new ArrayList<Integer>();
+			vrijeFrames.addAll(framenummers);
 
-	}
+			// Alle pageEntries die in het RAM zitten in de priorityqueue steken.
+			// Vervolgens de eerste 'aantal' pages van deze queue eruit halen
+			// Stel lijst te klein, kiezen voor random idle frames weg te geven.
+			PriorityQueue<TablePageEntry> ATqueue = new PriorityQueue<TablePageEntry>(16, ATcomp);
+
+			//Eerst de idle's checken om te verwijderen
+
+
+
+			for (TablePageEntry tpe : pageTable) {
+				if (tpe.getPresentBit() == 1) {
+					ATqueue.add(tpe);
+					vrijeFrames.remove(tpe.getFrameNummer());
+				}
+			}
+
+			int verwijderd = 0;
+			for(int a=0;a<aantal;a++) {
+				if(!vrijeFrames.isEmpty()) {
+					framenummers.remove(vrijeFrames.get(0));
+					vrijgekomenPlaatsen.add(vrijeFrames.get(0));
+					vrijeFrames.remove(0);
+					verwijderd++;
+				}
+			}
+
+
+			int aantalOver = aantal-verwijderd;
+			for (int a = 0; a < aantal; a++) {
+				if (!ATqueue.isEmpty()&&aantalOver>0) {
+					ATqueue.peek().setPresentBit(0);
+					ATqueue.peek().setModifyBit(0);
+					framenummers.remove(ATqueue.peek().getFrameNummer());
+					vrijgekomenPlaatsen.add(ATqueue.peek().getFrameNummer());
+					ATqueue.remove();
+					verwijderd++;
+					aantalOver--;
+				}
+			}
+
+			return vrijgekomenPlaatsen;
+
+		}
+
 	public boolean checkAanwezigFrame(int page, boolean write, int clock){
 		if(pageTable.get(page).getPresentBit()==1){
 			if(write){
