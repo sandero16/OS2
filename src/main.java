@@ -12,6 +12,7 @@ import java.util.Set;
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 
+import com.sun.org.apache.xpath.internal.SourceTree;
 import javafx.scene.control.Tab;
 import org.w3c.dom.Document;
 import org.w3c.dom.Element;
@@ -32,6 +33,11 @@ class Process {
 			pageTable.add(new TablePageEntry());
 		}
 	}
+	public void printFramenummers(){
+		for(Integer i: framenummers) {
+			System.out.print(i+" ");
+		}
+	}
 	public void printTable(){
 		System.out.println("size"+pageTable.size());
 		for(TablePageEntry tpe : pageTable){
@@ -39,6 +45,7 @@ class Process {
 			System.out.println();
 		}
 	}
+
 	public List<Integer> verwijderFrames(int aantal) {
 		List<Integer> vrijgekomenPlaatsen = new ArrayList<Integer>();
 		Comparator<TablePageEntry> ATcomp = new AccesTimeComparator();
@@ -82,13 +89,11 @@ class Process {
 		return vrijgekomenPlaatsen;
 
 	}
-	public boolean checkAanwezigFrame(int frame){
-		for(TablePageEntry tpe: pageTable){
-			if(tpe.getFrameNummer()==frame&&tpe.getPresentBit()==1)return true;
-		}
+	public boolean checkAanwezigFrame(int page){
+		if(pageTable.get(page).getPresentBit()==1)return true;
 		return false;
 	}
-	public void vervangLU(int frame, boolean write,int clock){
+	public void vervangLU(int page, boolean write,int clock){
 		//we zoeken de of er nog vrije gealoceerde ruimte is in het RAM
 		int count=0;
 		for(TablePageEntry t: pageTable){
@@ -116,44 +121,25 @@ class Process {
 			}
 			pageTable.get(index).setPresentBit(0);
 			pageTable.get(index).setModifyBit(0);
-			framenummers.remove(frame);
-			useFrame(frame,clock,write);
-
-			framenummers.add(frame);
+			int frame=pageTable.get(index).getFrameNummer();
+			framenummers.remove(page);
+			useFrame(page,clock,write,frame);
 
 		}
 		else{
-			//we gebruiken één van de gealloceerde plaatsen
-			boolean exist=false;
-			int index=0;
-			for(int j=0;j<pageTable.size();j++){
-				if(pageTable.get(j).getFrameNummer()==frame){
-					exist=true;
-					index=j;
-				}
-
-			}
-			if(exist)pageTable.get(index).setTableEntry(clock,write,frame);
-
-			if(!exist){
-				boolean found=false;
-				int index2=0;
-				for(int j=0;j<pageTable.size()&&!found;j++){
-					if(pageTable.get(j).getFrameNummer()==-1){
-						found=true;
-						index2=j;
+			boolean free=true;
+			boolean stop=false;
+			for(Integer i: framenummers){
+				for(int j=0;j<pageTable.size();j++){
+					if(pageTable.get(j).getFrameNummer()==i&&pageTable.get(j).getPresentBit()==1){
+						free=false;
 					}
-
 				}
-				pageTable.get(index2).setTableEntry(clock,write,frame);
+				if(free){
+					useFrame(page,clock,write,i);
+					stop=true;
+				}
 			}
-			framenummers.add(frame);
-
-
-			//pageTable.get(frame).getLastAccesTime()**nog te schrijven
-			//indien niet
-
-
 		}
 	}
 
@@ -192,22 +178,12 @@ class Process {
 
 
 	}
-	public void useFrame(int frame,int clock,boolean write){
-		//we kijken of het frame al in de pagetable staat of niet
-		int p=0;
-		boolean exists=false;
-		for(TablePageEntry t: pageTable){
-			if(t.getFrameNummer()==frame){
-				exists=true;
-				p=pageTable.indexOf(t);
-			}
-		}
-		if(exists){
-			pageTable.get(p).setLastAccesTime(clock);
-			pageTable.get(p).setPresentBit(1);
-			if(write)pageTable.get(p).setModifyBit(1);
-		}
-
+	public void useFrame(int page,int clock,boolean write, int frame){
+		pageTable.get(page).setLastAccesTime(clock);
+		pageTable.get(page).setPresentBit(1);
+		pageTable.get(page).setFrameNummer(frame);
+		if(write)pageTable.get(page).setModifyBit(1);
+		else pageTable.get(page).setModifyBit(0);
 	}
 	public void addFrame(Integer integer) {
 		framenummers.add(integer);
@@ -322,6 +298,12 @@ class Ram{
 		}
 		System.out.println();
 	}
+	public int getFrameFrom(int pid){
+		for(int i=0;i<processen.length;i++){
+			if(processen[i]==pid)return i;
+		}
+		return 0;
+	}
 	public void nieuwProcess(int id, List<Process> processenlijst) {
 		if (aantalProc == 4) {
 			int laagsteClock = 100000000;
@@ -351,6 +333,7 @@ class Ram{
 			processenIds.add(id);
 			aantalProc++;
 		} else {
+
 			List<Integer> vrijgekomenFrames = new ArrayList<Integer>();
 			int teVerwijderenPerProcess = (12 / aantalProc - 12 / (aantalProc + 1));
 			System.out.println("size"+processenIds.size());
@@ -362,7 +345,6 @@ class Ram{
 				System.out.println();
 			}
 			for (Integer i : vrijgekomenFrames) {
-
 				processen[i] = id;
 			}
 
@@ -493,15 +475,15 @@ public class main {
 
 	public static void doeRead() {
 		System.out.println("Ik doe read");
-		int frame=getFrame(st);
-		//we kijken of de frame nog niet aanwezig is in het RAM geheugen
-		if(!processenlijst.get(pid).checkAanwezigFrame(frame)){
-			//indien er nog geen frames van dit proces in het RAM geheugen zit moet er plaats worden gemaakt
+		int page=getPage(st);
+		//we kijken of de page nog niet aanwezig is in het RAM geheugen
+		if(!processenlijst.get(pid).checkAanwezigFrame(page)){
+			//indien er nog geen page van dit proces in het RAM geheugen zit moet er plaats worden gemaakt
 			if(processenlijst.get(pid).framenummers.size()==0){
-				LRUStart(frame,false);
+				LRUStart(page,false);
 			}
 			else{
-				LRUReadWrite(frame,false);
+				LRUReadWrite(page,false);
 			}
 		};
 
@@ -509,7 +491,7 @@ public class main {
 
 	public static void doeWrite() {
 		System.out.println("Ik doe write");
-		int frame=getFrame(st);
+		int frame=getPage(st);
 		if(!processenlijst.get(pid).checkAanwezigFrame(frame)){
 			if(processenlijst.get(pid).framenummers.size()==0){
 				System.out.println("hier");
@@ -530,13 +512,16 @@ public class main {
 	}
 
 
-	public static void LRUStart(int frame,boolean write) {
+	public static void LRUStart(int page,boolean write) {
 
 		System.out.println("LRU");
-
+		for(Process process: processenlijst){
+			process.printFramenummers();
+		}
 		RAM.nieuwProcess(pid, processenlijst);
-		if(frame!=-1) {
-			processenlijst.get(pid).useFrame(frame,clock,write);
+		int frame=RAM.getFrameFrom(pid);
+		if(page!=-1) {
+			processenlijst.get(pid).useFrame(page,clock,write,frame);
 
 		}
 		/*
@@ -545,16 +530,6 @@ public class main {
 		 */
 
 	}
-	public static void LRUNew(int frame,boolean write) {
-
-		System.out.println("LRU");
-
-		RAM.nieuwProcess(pid, processenlijst);
-		processenlijst.get(pid).useFrame(frame,clock,write);
-
-
-	}
-	
 	public static void LRULaagstTotaal(){
 		/*
 		 * totale acces time van fragments in proces optellen -> gene met laagste vervangen
@@ -567,15 +542,22 @@ public class main {
 		 * de 2^(3-n) fragments met laagste accesTime uit ram halen
 		 */
 	}
-	public static void LRUReadWrite(int frame, boolean write){
+	public static void LRUReadWrite(int page, boolean write){
 		/*
 		 * fragment met laagste accesTime dat van proces zelf is
 		 */
 
+		for(int i=0;i<processenlijst.size();i++){
+			System.out.println("*************************************"+" "+i);
+			processenlijst.get(i).printFramenummers();
+		}
+		processenlijst.get(pid).vervangLU(page,write,clock);
 		System.out.println("LRU");
-		processenlijst.get(pid).vervangLU(frame,write,clock);
+
+
+
 	}
-	public static int getFrame(int st){
+	public static int getPage(int st){
 		double temp=(double)st/4096;
 		//indien makkelijker-> veranderen
 		int temp2=st/4096;
