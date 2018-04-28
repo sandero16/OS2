@@ -89,8 +89,14 @@ class Process {
 		return vrijgekomenPlaatsen;
 
 	}
-	public boolean checkAanwezigFrame(int page){
-		if(pageTable.get(page).getPresentBit()==1)return true;
+	public boolean checkAanwezigFrame(int page, boolean write, int clock){
+		if(pageTable.get(page).getPresentBit()==1){
+			if(write){
+				pageTable.get(page).setModifyBit(1);
+				pageTable.get(page).setLastAccesTime(clock);
+			}
+			return true;
+		}
 		return false;
 	}
 	public void vervangLU(int page, boolean write,int clock){
@@ -122,13 +128,11 @@ class Process {
 			pageTable.get(index).setPresentBit(0);
 			pageTable.get(index).setModifyBit(0);
 			int frame=pageTable.get(index).getFrameNummer();
-			framenummers.remove(page);
 			useFrame(page,clock,write,frame);
 
 		}
 		else{
 			boolean free=true;
-			boolean stop=false;
 			for(Integer i: framenummers){
 				for(int j=0;j<pageTable.size();j++){
 					if(pageTable.get(j).getFrameNummer()==i&&pageTable.get(j).getPresentBit()==1){
@@ -137,7 +141,7 @@ class Process {
 				}
 				if(free){
 					useFrame(page,clock,write,i);
-					stop=true;
+					break;
 				}
 			}
 		}
@@ -477,7 +481,7 @@ public class main {
 		System.out.println("Ik doe read");
 		int page=getPage(st);
 		//we kijken of de page nog niet aanwezig is in het RAM geheugen
-		if(!processenlijst.get(pid).checkAanwezigFrame(page)){
+		if(!processenlijst.get(pid).checkAanwezigFrame(page,false,clock)){
 			//indien er nog geen page van dit proces in het RAM geheugen zit moet er plaats worden gemaakt
 			if(processenlijst.get(pid).framenummers.size()==0){
 				LRUStart(page,false);
@@ -492,7 +496,7 @@ public class main {
 	public static void doeWrite() {
 		System.out.println("Ik doe write");
 		int frame=getPage(st);
-		if(!processenlijst.get(pid).checkAanwezigFrame(frame)){
+		if(!processenlijst.get(pid).checkAanwezigFrame(frame,true,clock)){
 			if(processenlijst.get(pid).framenummers.size()==0){
 				System.out.println("hier");
 				LRUStart(frame,true);
