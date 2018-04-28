@@ -39,7 +39,7 @@ class Process {
 		}
 	}
 	public void printTable(){
-		System.out.println("size"+pageTable.size());
+		System.out.println("________________________"+"PROCESS:"+pid+"_________________________");
 		for(TablePageEntry tpe : pageTable){
 			tpe.printEntry();
 			System.out.println();
@@ -62,12 +62,15 @@ class Process {
 			//Eerst de idle's checken om te verwijderen
 
 
-
+		System.out.println("proces: "+pid);
 			for (TablePageEntry tpe : pageTable) {
 				if (tpe.getPresentBit() == 1) {
 					ATqueue.add(tpe);
-					vrijeFrames.remove(tpe.getFrameNummer());
+					vrijeFrames.remove((Integer)tpe.getFrameNummer());
 				}
+			}
+			for(Integer i: vrijeFrames){
+				System.out.println(i);
 			}
 
 			int verwijderd = 0;
@@ -349,13 +352,10 @@ class Ram{
 
 			List<Integer> vrijgekomenFrames = new ArrayList<Integer>();
 			int teVerwijderenPerProcess = (12 / aantalProc - 12 / (aantalProc + 1));
-			System.out.println("size"+processenIds.size());
 			for (Integer i : processenIds) {
 				vrijgekomenFrames.addAll(processenlijst.get(i).verwijderFrames(teVerwijderenPerProcess));
 				for(Integer ids: vrijgekomenFrames){
-					System.out.println("vrij: "+ids);
 				}
-				System.out.println();
 			}
 			for (Integer i : vrijgekomenFrames) {
 				processen[i] = id;
@@ -459,6 +459,7 @@ public class main {
 					p = new Instructie(pid, at, st);
 					instructielijst.add(p);
 					functies.get(at).run();
+					System.out.println("RAM: ");
 					RAM.printRam();
 					for(int k=0;k<processenlijst.size();k++){
 						processenlijst.get(k).printTable();
@@ -507,11 +508,9 @@ public class main {
 		int frame=getPage(st);
 		if(!processenlijst.get(pid).checkAanwezigFrame(frame,true,clock)){
 			if(processenlijst.get(pid).framenummers.size()==0){
-				System.out.println("hier");
 				LRUStart(frame,true);
 			}
 			else{
-				System.out.println("rw");
 				LRUReadWrite(frame,true);
 			}
 		}
@@ -528,15 +527,15 @@ public class main {
 	public static void LRUStart(int page,boolean write) {
 
 		System.out.println("LRU");
-		for(Process process: processenlijst){
-			process.printFramenummers();
-		}
+
 		RAM.nieuwProcess(pid, processenlijst);
 		int frame=RAM.getFrameFrom(pid);
 		if(page!=-1) {
 			processenlijst.get(pid).useFrame(page,clock,write,frame);
 
 		}
+
+		printFrames();
 		/*
 		 * 4 processen in ram -> 1 proces verwijderen => met laagste totale acces Time
 		 * 0-3 processen => per proces de 2^(3-n) met laagste acces Time
@@ -560,15 +559,21 @@ public class main {
 		 * fragment met laagste accesTime dat van proces zelf is
 		 */
 
-		for(int i=0;i<processenlijst.size();i++){
-			System.out.println("*************************************"+" "+i);
-			processenlijst.get(i).printFramenummers();
-		}
 		processenlijst.get(pid).vervangLU(page,write,clock);
 		System.out.println("LRU");
 
+		printFrames();
 
 
+
+	}
+	public static void printFrames(){
+		for(Process process: processenlijst){
+			System.out.println("Process id: " +process.pid);
+			process.printFramenummers();
+			System.out.println();
+		}
+		System.out.println();
 	}
 	public static int getPage(int st){
 		double temp=(double)st/4096;
